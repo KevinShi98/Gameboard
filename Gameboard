@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Volleyball Strategy Board</title>
+    <style>
+        /* Basic page resets */
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* The Court Container */
+        #court-container {
+            width: 90vw;
+            max-width: 600px;
+            height: 90vw; /* Makes it roughly square initially */
+            max-height: 600px;
+            background-color: #FFCC99; /* Wood floor color */
+            border: 3px solid #333;
+            position: relative;
+            overflow: hidden; /* Keep players inside */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-image:
+                linear-gradient(white 2px, transparent 2px), /* Attack lines */
+                linear-gradient(90deg, white 2px, transparent 2px);
+            background-size: 100% 33.33%, 50% 100%; /* Rough grid for front/back court */
+            background-position: 0 33.33%; /* Offset horizontal line */
+            background-repeat: no-repeat;
+        }
+
+        /* The Net (visual element at the top) */
+        #net-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            background: repeating-linear-gradient(
+                45deg,
+                #ddd,
+                #ddd 5px,
+                #fff 5px,
+                #fff 10px
+            );
+            border-bottom: 4px double #555;
+            z-index: 0; /* Behind players */
+        }
+
+        /* The Player Circles */
+        .player {
+            width: 60px;
+            height: 60px;
+            background-color: #fff;
+            border: 3px solid #007bff;
+            border-radius: 50%;
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #333;
+            cursor: grab;
+            user-select: none; /* Prevents text highlighting while dragging */
+            touch-action: none; /* Essential for preventing page scroll on mobile drag */
+            z-index: 10;
+            background-size: cover;
+            background-position: center;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+
+        .player:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        /* Text inside player (hidden if image exists) */
+        .player-label {
+            text-align: center;
+            pointer-events: none;
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 14px;
+        }
+
+        /* Volleyball */
+        #volleyball {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            position: absolute;
+            top: 45%;
+            left: 45%;
+            z-index: 12;
+            cursor: grab;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            border: 2px solid #333;
+            /* Simple volleyball look using gradients */
+            background:
+                radial-gradient(circle at 30% 30%, #ffffff 0, #ffffff 40%, #f2f2f2 41%, #f2f2f2 100%),
+                linear-gradient(60deg,
+                    #ffd54f 0 20%,
+                    transparent 21% 40%,
+                    #42a5f5 41% 60%,
+                    transparent 61% 80%,
+                    #ef5350 81% 100%);
+        }
+
+        /* --- Modal Styling --- */
+        #modal-overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #settings-modal {
+            background-color: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 320px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        h3 { margin-top: 0; color: #333; }
+
+        .form-group { margin-bottom: 15px; }
+
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box; /* Ensures padding doesn't affect width */
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        /* Custom file input styling */
+        .file-upload-btn {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        #image-preview {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid #ddd;
+            margin-top: 10px;
+            display: none;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #save-btn { background-color: #007bff; color: white; }
+        #cancel-btn { background-color: #ddd; color: #333; }
+    </style>
+</head>
+<body>
+
+    <h2>Strategy Board</h2>
+
+    <div id="court-container">
+        <div id="net-area"></div>
+
+        <div class="player" style="top: 25%; left: 15%;" data-role="OH" data-name="">
+            <span class="player-label">OH</span>
+        </div>
+        <div class="player" style="top: 25%; left: 45%;" data-role="S" data-name="">
+            <span class="player-label">S</span>
+        </div>
+        <div class="player" style="top: 25%; left: 75%;" data-role="MB" data-name="">
+            <span class="player-label">MB</span>
+        </div>
+
+        <div class="player" style="top: 60%; left: 15%;" data-role="MB" data-name="">
+            <span class="player-label">MB</span>
+        </div>
+        <div class="player" style="top: 60%; left: 45%;" data-role="L" data-name="">
+            <span class="player-label">L</span>
+        </div>
+        <div class="player" style="top: 60%; left: 75%;" data-role="OH" data-name="">
+            <span class="player-label">OH</span>
+        </div>
+
+        <!-- Volleyball -->
+        <div id="volleyball"></div>
+    </div>
+
+    <div id="modal-overlay">
+        <div id="settings-modal">
+            <h3>Player Settings</h3>
+
+            <div class="form-group">
+                <label>Player Image (Face):</label>
+                <input type="file" id="player-img-input" accept="image/*" style="display: none;">
+                <label for="player-img-input" class="file-upload-btn">Choose Image...</label>
+                <div id="image-preview"></div>
+                <button type="button" id="clear-image-btn" style="margin-top:5px; padding: 5px 10px; font-size: 12px; display:none;">Clear Image</button>
+            </div>
+
+            <div class="form-group">
+                <label for="player-name-input">Name (if no image):</label>
+                <input type="text" id="player-name-input" placeholder="Enter Name">
+            </div>
+
+            <div class="form-group">
+                <label for="player-role-select">Role:</label>
+                <select id="player-role-select">
+                    <option value="OH">OH (Outside Hitter)</option>
+                    <option value="MB">MB (Middle Blocker)</option>
+                    <option value="S">S (Setter)</option>
+                    <option value="L">L (Libero)</option>
+                    <option value="OPP">OPP (Opposite)</option>
+                    <option value="DS">DS (Defensive Specialist)</option>
+                </select>
+            </div>
+
+            <div class="modal-buttons">
+                <button id="cancel-btn">Cancel</button>
+                <button id="save-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const court = document.getElementById('court-container');
+        const players = document.querySelectorAll('.player');
+        const volleyball = document.getElementById('volleyball');
+        const draggableItems = [...players, volleyball];
+
+        // Modal Elements
+        const modalOverlay = document.getElementById('modal-overlay');
+        const nameInput = document.getElementById('player-name-input');
+        const roleSelect = document.getElementById('player-role-select');
+        const imgInput = document.getElementById('player-img-input');
+        const imgPreview = document.getElementById('image-preview');
+        const clearImgBtn = document.getElementById('clear-image-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+
+        let activePlayer = null; // Tracks which player is currently being edited
+        let tempImageDataUrl = null; // Temporarily holds uploaded image data before saving
+
+        // --- Drag and Drop Functionality ---
+        let isDragging = false;
+        let dragItem = null;
+        let offsetX, offsetY;
+
+        // Handles both Mouse and Touch starts
+        function startDrag(e) {
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            isDragging = true;
+            dragItem = this;
+
+            const rect = dragItem.getBoundingClientRect();
+            offsetX = clientX - rect.left;
+            offsetY = clientY - rect.top;
+            dragItem.style.zIndex = 100; // Bring to front while dragging
+        }
+
+        // Handles movement
+        function doDrag(e) {
+            if (!isDragging || !dragItem) return;
+
+            if (e.cancelable) e.preventDefault(); // prevent scroll on touch
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            const courtRect = court.getBoundingClientRect();
+
+            let newX = clientX - courtRect.left - offsetX;
+            let newY = clientY - courtRect.top - offsetY;
+
+            // Boundary checks
+            newX = Math.max(0, Math.min(newX, courtRect.width - dragItem.offsetWidth));
+            newY = Math.max(0, Math.min(newY, courtRect.height - dragItem.offsetHeight));
+
+            dragItem.style.left = newX + 'px';
+            dragItem.style.top = newY + 'px';
+        }
+
+        // Stop dragging
+        function stopDrag() {
+            if (dragItem) {
+                dragItem.style.zIndex = 10;
+            }
+            isDragging = false;
+            dragItem = null;
+        }
+
+        // --- Long Press Detection ---
+        let pressTimer;
+        let isLongPress = false;
+        const longPressDuration = 700; // ms
+
+        draggableItems.forEach(item => {
+            // --- Touch Events (Mobile) ---
+            item.addEventListener('touchstart', (e) => {
+                isLongPress = false;
+                pressTimer = setTimeout(() => {
+                    isLongPress = true;
+                    isDragging = false;
+                    // Only open modal for player circles, not the ball
+                    if (item.classList.contains('player')) {
+                        openModal(item);
+                    }
+                }, longPressDuration);
+                startDrag.call(item, e);
+            }, { passive: false });
+
+            item.addEventListener('touchmove', (e) => {
+                if (isDragging) clearTimeout(pressTimer);
+                doDrag(e);
+            }, { passive: false });
+
+            item.addEventListener('touchend', () => {
+                clearTimeout(pressTimer);
+                stopDrag();
+            });
+
+            // --- Mouse Events (Desktop) ---
+            item.addEventListener('mousedown', (e) => {
+                isLongPress = false;
+                pressTimer = setTimeout(() => {
+                    isLongPress = true;
+                    isDragging = false;
+                    if (item.classList.contains('player')) {
+                        openModal(item);
+                    }
+                }, longPressDuration);
+                startDrag.call(item, e);
+            });
+
+            item.addEventListener('mousemove', () => clearTimeout(pressTimer));
+        });
+
+        document.addEventListener('mousemove', doDrag);
+        document.addEventListener('mouseup', () => {
+            clearTimeout(pressTimer);
+            stopDrag();
+        });
+
+        // --- Modal Logic ---
+        function openModal(playerDiv) {
+            activePlayer = playerDiv;
+            nameInput.value = activePlayer.dataset.name || "";
+            roleSelect.value = activePlayer.dataset.role;
+
+            const currentBg = activePlayer.style.backgroundImage;
+            if (currentBg && currentBg !== 'none') {
+                tempImageDataUrl = currentBg.slice(4, -1).replace(/["']/g, "");
+                imgPreview.style.backgroundImage = currentBg;
+                imgPreview.style.display = 'block';
+                clearImgBtn.style.display = 'inline-block';
+            } else {
+                tempImageDataUrl = null;
+                imgPreview.style.display = 'none';
+                clearImgBtn.style.display = 'none';
+            }
+            imgInput.value = "";
+
+            modalOverlay.style.display = 'flex';
+        }
+
+        function closeModal() {
+            modalOverlay.style.display = 'none';
+            activePlayer = null;
+            tempImageDataUrl = null;
+        }
+
+        // Handle File Selection within Modal
+        imgInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    tempImageDataUrl = e.target.result;
+                    imgPreview.style.backgroundImage = `url('${tempImageDataUrl}')`;
+                    imgPreview.style.display = 'block';
+                    clearImgBtn.style.display = 'inline-block';
+                }
+                reader.readAsDataURL(this.files[0]);
+            }
+        });
+
+        // Handle Clear Image button
+        clearImgBtn.addEventListener('click', function() {
+            tempImageDataUrl = null;
+            imgPreview.style.backgroundImage = 'none';
+            imgPreview.style.display = 'none';
+            imgInput.value = "";
+            this.style.display = 'none';
+        });
+
+        // Handle Save Button Click
+        saveBtn.addEventListener('click', () => {
+            if (!activePlayer) return;
+
+            const newName = nameInput.value.trim();
+            const newRole = roleSelect.value;
+            const labelSpan = activePlayer.querySelector('.player-label');
+
+            activePlayer.dataset.name = newName;
+            activePlayer.dataset.role = newRole;
+
+            if (tempImageDataUrl) {
+                activePlayer.style.backgroundImage = `url('${tempImageDataUrl}')`;
+                labelSpan.style.display = 'none';
+            } else {
+                activePlayer.style.backgroundImage = 'none';
+                labelSpan.style.display = 'block';
+
+                if (newName.length > 0) {
+                    labelSpan.textContent = newName;
+                } else {
+                    labelSpan.textContent = newRole;
+                }
+            }
+            closeModal();
+        });
+
+        cancelBtn.addEventListener('click', closeModal);
+
+        // Close modal if clicking outside the box
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeModal();
+        });
+    </script>
+</body>
+</html>
