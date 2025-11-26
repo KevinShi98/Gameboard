@@ -267,11 +267,30 @@ copyLinkBtn.addEventListener('click', async () => {
         alert('This page is not served over http/https. The link will only work properly once you upload this HTML to a website and set PUBLIC_BASE_URL.');
     }
 
+    // Show link in textbox
     linkDisplay.value = finalURL;
     linkDisplay.style.display = 'inline-block';
     linkDisplay.focus();
     linkDisplay.select();
-    window.prompt('Copy this link (Ctrl/Cmd+C):', finalURL);
+
+    // Try to auto-copy
+    let copied = false;
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(finalURL);
+            copied = true;
+        } else if (document.execCommand) {
+            copied = document.execCommand('copy');
+        }
+    } catch (err) {
+        console.warn('Clipboard copy failed', err);
+    }
+
+    if (copied) {
+        alert('Link copied!');
+    } else {
+        alert('Could not automatically copy. Please long-press or Ctrl/Cmd+C the text box.');
+    }
 });
 
 // Initial load from hash if present
