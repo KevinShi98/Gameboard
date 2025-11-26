@@ -204,8 +204,6 @@
 
     <h2>Strategy Board</h2>
 
-    <button id="copy-link-btn">Copy board link</button>
-
     <div id="court-container">
         <div id="net-area"></div>
 
@@ -228,9 +226,14 @@
         <div class="player" style="top: 60%; left: 75%;" data-role="OH" data-name="">
             <span class="player-label">OH</span>
         </div>
-
+        
         <!-- Volleyball -->
         <div id="volleyball"></div>
+    </div>
+
+    <!-- Moved button below the court -->
+    <div style="margin-top: 15px; text-align:center;">
+        <button id="copy-link-btn">Copy board link</button>
     </div>
 
     <div id="modal-overlay">
@@ -533,7 +536,6 @@
         function encodeStateToHash() {
             const state = getBoardState();
             const json = JSON.stringify(state);
-            // encodeURIComponent to be safe with non-ASCII
             const encoded = btoa(encodeURIComponent(json));
             return '#board=' + encoded;
         }
