@@ -192,11 +192,19 @@
 
         #save-btn { background-color: #007bff; color: white; }
         #cancel-btn { background-color: #ddd; color: #333; }
+
+        #copy-link-btn {
+            margin-bottom: 10px;
+            background-color: #28a745;
+            color: white;
+        }
     </style>
 </head>
 <body>
 
     <h2>Strategy Board</h2>
+
+    <button id="copy-link-btn">Copy board link</button>
 
     <div id="court-container">
         <div id="net-area"></div>
@@ -276,6 +284,7 @@
         const clearImgBtn = document.getElementById('clear-image-btn');
         const saveBtn = document.getElementById('save-btn');
         const cancelBtn = document.getElementById('cancel-btn');
+        const copyLinkBtn = document.getElementById('copy-link-btn');
 
         let activePlayer = null; // Tracks which player is currently being edited
         let tempImageDataUrl = null; // Temporarily holds uploaded image data before saving
@@ -466,6 +475,106 @@
         modalOverlay.addEventListener('click', (e) => {
             if (e.target === modalOverlay) closeModal();
         });
+
+        // --- Shareable Link Logic (encode board into URL hash) ---
+
+        function getBoardState() {
+            const playerStates = Array.from(players).map(p => ({
+                name: p.dataset.name || "",
+                role: p.dataset.role || "",
+                left: p.style.left || "",
+                top: p.style.top || "",
+                bg: p.style.backgroundImage || ""
+            }));
+
+            const ballState = {
+                left: volleyball.style.left || "",
+                top: volleyball.style.top || ""
+            };
+
+            return { players: playerStates, ball: ballState };
+        }
+
+        function applyBoardState(state) {
+            if (!state || !state.players || state.players.length !== players.length) return;
+
+            state.players.forEach((ps, idx) => {
+                const p = players[idx];
+                const labelSpan = p.querySelector('.player-label');
+
+                p.dataset.name = ps.name || "";
+                p.dataset.role = ps.role || "";
+
+                if (ps.left) p.style.left = ps.left;
+                if (ps.top) p.style.top = ps.top;
+
+                if (ps.bg && ps.bg !== "none") {
+                    p.style.backgroundImage = ps.bg;
+                    if (labelSpan) labelSpan.style.display = "none";
+                } else {
+                    p.style.backgroundImage = "none";
+                    if (labelSpan) {
+                        labelSpan.style.display = "block";
+                        if (ps.name) {
+                            labelSpan.textContent = ps.name;
+                        } else if (ps.role) {
+                            labelSpan.textContent = ps.role;
+                        }
+                    }
+                }
+            });
+
+            if (state.ball) {
+                if (state.ball.left) volleyball.style.left = state.ball.left;
+                if (state.ball.top) volleyball.style.top = state.ball.top;
+            }
+        }
+
+        function encodeStateToHash() {
+            const state = getBoardState();
+            const json = JSON.stringify(state);
+            // encodeURIComponent to be safe with non-ASCII
+            const encoded = btoa(encodeURIComponent(json));
+            return '#board=' + encoded;
+        }
+
+        function decodeStateFromHash() {
+            if (!location.hash.startsWith('#board=')) return null;
+            const encoded = location.hash.substring(7); // after '#board='
+            try {
+                const json = decodeURIComponent(atob(encoded));
+                return JSON.parse(json);
+            } catch (e) {
+                console.error('Failed to decode board state from URL', e);
+                return null;
+            }
+        }
+
+        function loadBoardFromHash() {
+            const state = decodeStateFromHash();
+            if (state) applyBoardState(state);
+        }
+
+        copyLinkBtn.addEventListener('click', async () => {
+            const hash = encodeStateToHash();
+            const url = location.origin + location.pathname + hash;
+
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(url);
+                    alert('Board link copied to clipboard!');
+                } else {
+                    // Fallback
+                    prompt('Copy this link:', url);
+                }
+            } catch (e) {
+                console.error(e);
+                prompt('Copy this link:', url);
+            }
+        });
+
+        // On load, if URL has a board hash, apply it
+        loadBoardFromHash();
     </script>
 </body>
 </html>
